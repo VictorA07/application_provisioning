@@ -204,7 +204,61 @@ resource "aws_security_group" "capbackend-SG" {
 #Creating Database
 
 #Creating S3 Bucket
+#Creating S3 media bucket
+resource "aws_s3_bucket" "capmedia" {
+    bucket = "capmedia"
+    tags = {
+        Name = "cap-media"
+    }
+  
+}
+resource "aws_s3_bucket_ownership_controls" "capmedia-ct" {
+    bucket = aws_s3_bucket.capmedia.id
+    rule {
+      object_ownership = "BucketOwnerPreferred"
+    }
+    depends_on = [ aws_s3_bucket_public_access_block.capmedia-pab ]
+  
+}
+resource "aws_s3_bucket_public_access_block" "capmedia-pab" {
+    bucket = aws_s3_bucket.capmedia.id
+    block_public_acls = false
+    block_public_policy = false
+    ignore_public_acls = false
+    restrict_public_buckets = false
+    
+}
+resource "aws_s3_bucket_acl" "cap-media-acl" {
+    bucket = aws_s3_bucket.capmedia.id
+    depends_on = [ aws_s3_bucket_ownership_controls.capmedia-ct]
+    acl = "public-read"
+  
+}
+#Creating Bucket policy
+resource "aws_s3_bucket_policy" "cap-media-policy" {
+    bucket = aws_s3_bucket.capmedia.id
+    policy = data.aws_iam_policy_document.cap-media.json
+}
+data "aws_iam_policy_document" "cap-media"{   
+    
+    statement   {
+        principals {
+            type = "*"
+            identifiers = ["*"]
 
+        }
+        actions = [
+            "s3:GetObject"
+        ]
+    
+
+        resources = [
+            aws_s3_bucket.capmedia.arn,
+            "${aws_s3_bucket.capmedia.arn}/*",
+        ]
+    }
+    depends_on = [ aws_s3_bucket_public_access_block.capmedia-pab ]
+}
 
 #Creating S3 code bucket
 
