@@ -1,6 +1,7 @@
 provider "aws"{
   
 }
+
 #Creating VPC
 resource "aws_vpc" "capstonevpc" {
   cidr_block = "10.0.0.0/16"
@@ -162,8 +163,6 @@ resource "aws_security_group" "capfrontend-SG" {
         cidr_blocks = ["0.0.0.0/0"]
 
     }
-
-
   
 }
 #Creating Private Security group
@@ -177,7 +176,8 @@ resource "aws_security_group" "capbackend-SG" {
         from_port = 22
         to_port = 22
         protocol = "tcp"
-        cidr_blocks = [aws_security_group.capfrontend-SG.id]
+        cidr_blocks = ["0.0.0.0/0"]
+        #cidr_blocks = [aws_security_group.capfrontend-SG.id]
 
     }
     ingress {
@@ -185,7 +185,8 @@ resource "aws_security_group" "capbackend-SG" {
         from_port = 3306
         to_port = 3306
         protocol = "tcp"
-        cidr_blocks = [aws_security_group.capfrontend-SG.id]
+        cidr_blocks = ["0.0.0.0/0"]
+        #cidr_blocks = [aws_security_group.capfrontend-SG.id]
 
     }
 
@@ -200,8 +201,31 @@ resource "aws_security_group" "capbackend-SG" {
 
 #Creating Multi AZ RDS
 #Creating RDS subnet group
+resource "aws_db_subnet_group" "cap-db-sn" {
+    name = "cap-db-sn"
+    subnet_ids = [aws_subnet.capprv1.id, aws_subnet.capprv2.id]
+
+    tags = {
+      Name = "cap-db-subnet"
+    }
+  
+}
 
 #Creating Database
+resource "aws_db_instance" "cap-db" {
+    allocated_storage = 10
+    db_name = "capdb"
+    engine = "mysql"
+    engine_version = "8.0.33"
+    instance_class = "db.t3.micro"
+    username = "Admin"
+    password = "Admin123"
+    parameter_group_name = "default.mysql8.0"
+    db_subnet_group_name = "cap-db-sn"
+    vpc_security_group_ids = [aws_security_group.capbackend-SG.id]
+    skip_final_snapshot = true
+    
+}
 
 #Creating S3 Bucket
 #Creating S3 media bucket
@@ -261,13 +285,90 @@ data "aws_iam_policy_document" "cap-media"{
 }
 
 #Creating S3 code bucket
+resource "aws_s3_bucket" "capcode" {
+    bucket = "capcode"
+    tags = {
+        Name = "cap-code"
+    }
+  
+}
 
-#Creating bucket policy
+
 
 #Creating log Bucket
+resource "aws_s3_bucket" "cap-log" {
+    bucket = "my-cap-log"
+}
+resource "aws_s3_bucket_acl" "cap-log-acl" {
+    bucket = aws_s3_bucket.cap-log.id
+    depends_on = [ aws_s3_bucket_ownership_controls.cap-log-ct ]
+    acl = "log-delivery-write"
+}
+resource "aws_s3_bucket_ownership_controls" "cap-log-ct" {
+    bucket = aws_s3_bucket.cap-log.id
+    rule {
+      object_ownership = "BucketOwnerPreferred"
+    }
+    #depends_on = [ aws_s3_bucket_acl.cap-log-acl ]
+  
+}
+resource "aws_s3_bucket_logging" "capcode" {
+    bucket = aws_s3_bucket.capcode.id
+    target_bucket = aws_s3_bucket.cap-log.id
+    target_prefix = "log/"
+  
+}
+resource "aws_s3_bucket_logging" "capmedia" {
+    bucket = aws_s3_bucket.capmedia.id
+    target_bucket = aws_s3_bucket.cap-log.id
+    target_prefix = "log/"
+  
+}
 
 #Creating log bucket policy
 
 #Creating IAM role and IAM instnace profile
+
+resource "aws_iam_role" "cap-S3IAM" {
+    name = "cap-S3IAM"
+    assume_role_policy = data.aws_iam_policy_document.cap-S3IAM-rol.json
+}
+data "aws_iam_policy_document" "cap-S3IAM-rol" {
+    statement {
+      effect = "Allow"
+
+      principals {
+        type = "Service"
+        identifiers = ["ec2.amazonaws.com"]
+
+      }
+      actions = ["sts:AssumeRole"]
+    }
+}
+resource "aws_iam_policy" "cap-S3IAM" {
+    name = "cap-S3IAM"
+    description = "Access to Ec2 instnace and S3 bucket"
+    policy = data.aws_iam_policy_document.cap-S3IAM-pol.json
+  
+}
+data "aws_iam_policy_document" "cap-S3IAM-pol" {
+    statement {
+      effect = "Allow"
+      actions = ["s3:*"]
+      resources = ["*"]
+    }
+  
+}
+
+resource "aws_iam_role_policy_attachment" "cap-S3IAM" {
+    role = aws_iam_role.cap-S3IAM.name
+    policy_arn = aws_iam_policy.cap-S3IAM.arn
+
+}
+resource "aws_iam_instance_profile" "cap-S3IAM" {
+  name = "cap-S3IAM"
+  role = aws_iam_role.cap-S3IAM.name
+  
+}   
 
 #Wordpress configuration and spinning up instance
