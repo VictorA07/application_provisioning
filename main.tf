@@ -231,6 +231,7 @@ resource "aws_db_instance" "cap-db" {
 #Creating S3 media bucket
 resource "aws_s3_bucket" "capmedia" {
     bucket = "capmedia"
+    force_destroy = true
     tags = {
         Name = "cap-media"
     }
@@ -274,8 +275,6 @@ data "aws_iam_policy_document" "cap-media"{
         actions = [
             "s3:GetObject"
         ]
-    
-
         resources = [
             aws_s3_bucket.capmedia.arn,
             "${aws_s3_bucket.capmedia.arn}/*",
@@ -287,6 +286,7 @@ data "aws_iam_policy_document" "cap-media"{
 #Creating S3 code bucket
 resource "aws_s3_bucket" "capcode" {
     bucket = "capcode"
+    force_destroy = true
     tags = {
         Name = "cap-code"
     }
@@ -298,6 +298,7 @@ resource "aws_s3_bucket" "capcode" {
 #Creating log Bucket
 resource "aws_s3_bucket" "cap-log" {
     bucket = "my-cap-log"
+    force_destroy = true
 }
 resource "aws_s3_bucket_acl" "cap-log-acl" {
     bucket = aws_s3_bucket.cap-log.id
@@ -312,20 +313,32 @@ resource "aws_s3_bucket_ownership_controls" "cap-log-ct" {
     #depends_on = [ aws_s3_bucket_acl.cap-log-acl ]
   
 }
-resource "aws_s3_bucket_logging" "capcode" {
-    bucket = aws_s3_bucket.capcode.id
-    target_bucket = aws_s3_bucket.cap-log.id
-    target_prefix = "log/"
-  
-}
-resource "aws_s3_bucket_logging" "capmedia" {
-    bucket = aws_s3_bucket.capmedia.id
-    target_bucket = aws_s3_bucket.cap-log.id
-    target_prefix = "log/"
-  
-}
 
 #Creating log bucket policy
+
+resource "aws_s3_bucket_policy" "log-policy" {
+    bucket = aws_s3_bucket.cap-log.id
+    policy = data.aws_iam_policy_document.log-bk-policy.json
+}
+data "aws_iam_policy_document" "log-bk-policy"{   
+    
+    statement   {
+        principals {
+            type = "*"
+            identifiers = ["*"]
+
+        }
+        actions = [
+            "s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"
+        ]
+        resources = [
+            aws_s3_bucket.cap-log.arn,
+            "${aws_s3_bucket.cap-log.arn}/*",
+        ]
+    }
+   
+}
+
 
 #Creating IAM role and IAM instnace profile
 
@@ -345,8 +358,8 @@ data "aws_iam_policy_document" "cap-S3IAM-rol" {
       actions = ["sts:AssumeRole"]
     }
 }
-resource "aws_iam_policy" "cap-S3IAM" {
-    name = "cap-S3IAM"
+resource "aws_iam_policy" "S3IAM-policy" {
+    name = "S3IAM-policy"
     description = "Access to Ec2 instnace and S3 bucket"
     policy = data.aws_iam_policy_document.cap-S3IAM-pol.json
   
@@ -362,7 +375,7 @@ data "aws_iam_policy_document" "cap-S3IAM-pol" {
 
 resource "aws_iam_role_policy_attachment" "cap-S3IAM" {
     role = aws_iam_role.cap-S3IAM.name
-    policy_arn = aws_iam_policy.cap-S3IAM.arn
+    policy_arn = aws_iam_policy.S3IAM-policy.arn
 
 }
 resource "aws_iam_instance_profile" "cap-S3IAM" {
