@@ -1,9 +1,6 @@
-provider "aws"{  
-}
-
 #Creating VPC
 resource "aws_vpc" "capstonevpc" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block = var.vpc_cidr
   instance_tenancy = "default"
   tags = {
     Name: "capstonevpc"
@@ -12,223 +9,230 @@ resource "aws_vpc" "capstonevpc" {
 
 #Creating public subnet1
 resource "aws_subnet" "cappub1" {
-    vpc_id = aws_vpc.capstonevpc.id
-    cidr_block = "10.0.1.0/24"
-    availability_zone = "eu-north-1a"
-    map_public_ip_on_launch = true
-    tags = {
-      Name: "cappub1"
-    }
+  vpc_id = aws_vpc.capstonevpc.id
+  cidr_block = var.Psbn1
+  availability_zone = var.AZ1
+  map_public_ip_on_launch = true
+  tags = {
+    Name: "cappub1"
+  }
 }
 
 #Creating public subnet2
 resource "aws_subnet" "cappub2" {
-    vpc_id = aws_vpc.capstonevpc.id
-    cidr_block = "10.0.2.0/24"
-    availability_zone = "eu-north-1b"
-    tags = {
-      Name: "cappub2"
-    }
+  vpc_id = aws_vpc.capstonevpc.id
+  cidr_block = var.Psbn2
+  availability_zone = var.AZ2
+  tags = {
+    Name: "cappub2"
+  }
 }
 
 #Creating private subnet1
 resource "aws_subnet" "capprv1" {
-    vpc_id = aws_vpc.capstonevpc.id
-    cidr_block = "10.0.3.0/24"
-    availability_zone = "eu-north-1a"
-    tags = {
-      Name: "capprv1"
-    }
+  vpc_id = aws_vpc.capstonevpc.id
+  cidr_block = var.Prsbn1
+  availability_zone = var.AZ1
+  tags = {
+    Name: "capprv1"
+  }
 }
 
 #Creating private subnet2
 resource "aws_subnet" "capprv2" {
-    vpc_id = aws_vpc.capstonevpc.id
-    cidr_block = "10.0.4.0/24"
-    availability_zone = "eu-north-1b"
-    tags = {
-      Name: "capprv1"
-    }
+  vpc_id = aws_vpc.capstonevpc.id
+  cidr_block = var.Prsbn2
+  availability_zone = var.AZ2
+  tags = {
+    Name: "capprv1"
+  }
 }
 
 #Creating Internet gateway
 resource "aws_internet_gateway" "cap-IGW" {
-    vpc_id = aws_vpc.capstonevpc.id
-    tags = {
-        Name: "cap-IGW"
-    }
+  vpc_id = aws_vpc.capstonevpc.id
+  tags = {
+      Name: "cap-IGW"
+  }
 }
 
 #Creating Elastic IP
 resource "aws_eip" "cap-EIP" {
-    domain = "vpc"
-    depends_on = [ aws_internet_gateway.cap-IGW ]
+  domain = "vpc"
+  depends_on = [ aws_internet_gateway.cap-IGW ]
 }
 
 #Creating NAT gateway
-resource "aws_nat_gateway" "cap-NAT" {
-    allocation_id = aws_eip.cap-EIP.id
-    subnet_id = aws_subnet.cappub1.id
-    connectivity_type = "public"
-    tags = {
-      Name: "cap-NAT"
-    }
-    depends_on = [ aws_internet_gateway.cap-IGW ]
+resource "aws_nat_gateway" "cap-NGW" {
+  allocation_id = aws_eip.cap-EIP.id
+  subnet_id = aws_subnet.cappub1.id
+  connectivity_type = "public"
+  tags = {
+    Name: "cap-NGW"
+  }
+  depends_on = [ aws_internet_gateway.cap-IGW ]
 }
 
 #Creating Public Route table and route table association
 resource "aws_route_table" "cappub-rt" {
-    vpc_id = aws_vpc.capstonevpc.id
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.cap-IGW.id
-    }
-    tags = {
-      Name: "cappub-rt"
-    }
+  vpc_id = aws_vpc.capstonevpc.id
+  route {
+    cidr_block = var.all_access_cidr
+    gateway_id = aws_internet_gateway.cap-IGW.id
+  }
+  tags = {
+    Name: "cappub-rt"
+  }
 }
 
 #Creating public route table association to pub subnet 1
 resource "aws_route_table_association" "public-rt-sn1" {
-    subnet_id = aws_subnet.cappub1.id
-    route_table_id = aws_route_table.cappub-rt.id
+  subnet_id = aws_subnet.cappub1.id
+  route_table_id = aws_route_table.cappub-rt.id
 }
 
 #Creating public route table association to pub subnet 2
 resource "aws_route_table_association" "public-rt-sn2" {
-    subnet_id = aws_subnet.cappub2.id
-    route_table_id = aws_route_table.cappub-rt.id
+  subnet_id = aws_subnet.cappub2.id
+  route_table_id = aws_route_table.cappub-rt.id
 }
 
 #Creating private Route table and route table association
-#Creating private Route table and route table association
 resource "aws_route_table" "capprv-rt" {
-    vpc_id = aws_vpc.capstonevpc.id
-    route {
-        cidr_block = "0.0.0.0/0"
-        nat_gateway_id = aws_nat_gateway.cap-NAT.id
-    }
-    tags = {
-      Name: "capprv-rt"
-    }
+  vpc_id = aws_vpc.capstonevpc.id
+  route {
+    cidr_block = var.all_access_cidr
+    nat_gateway_id = aws_nat_gateway.cap-NGW.id
+  }
+  tags = {
+    Name: "capprv-rt"
+  }
 }
 
 #Creating private route table association prv subnet 1
 resource "aws_route_table_association" "private-rt-sn1" {
-    subnet_id = aws_subnet.capprv1.id
-    route_table_id = aws_route_table.capprv-rt.id
+  subnet_id = aws_subnet.capprv1.id
+  route_table_id = aws_route_table.capprv-rt.id
 }
 
 #Creating private route table association to prv subnet 2
 resource "aws_route_table_association" "private-rt-sn2" {
-    subnet_id = aws_subnet.capprv2.id
-    route_table_id = aws_route_table.capprv-rt.id
+  subnet_id = aws_subnet.capprv2.id
+  route_table_id = aws_route_table.capprv-rt.id
 }
 
 #Creating Public Security group
 resource "aws_security_group" "capfrontend-SG" {
-    name = "frontend-SG"
-    description = "frontend SG"
-    vpc_id = aws_vpc.capstonevpc.id
-
-    ingress {
-        description = "SSH"
-        from_port = 22
-        to_port = 22
-        protocol = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    ingress {
-        description = "HTTP"
-        from_port = 80
-        to_port = 80
-        protocol = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    egress {
-        from_port = 0
-        to_port = 0
-        protocol = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
+  name = "frontend-SG"
+  description = "frontend SG"
+  vpc_id = aws_vpc.capstonevpc.id
+# ssh inbound rule
+  ingress {
+    description = "SSH"
+    from_port = var.ssh_port
+    to_port = var.ssh_port
+    protocol = "tcp"
+    cidr_blocks = [var.all_access_cidr]
+  }
+# http inbound rule
+  ingress {
+    description = "HTTP"
+    from_port = var.http_port
+    to_port = var.http_port
+    protocol = "tcp"
+    cidr_blocks = [var.all_access_cidr]
+  }
+# https inbound rule
+  ingress {
+    description = "HTTP"
+    from_port = var.http_port
+    to_port = var.http_port
+    protocol = "tcp"
+    cidr_blocks = [var.all_access_cidr]
+  }
+# outbound rule
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = [var.all_access_cidr]
+  }
 }
 
 #Creating Private Security group
 resource "aws_security_group" "capbackend-SG" {
-    name = "backend-SG"
-    description = "backend SG"
-    vpc_id = aws_vpc.capstonevpc.id
+  name = "backend-SG"
+  description = "backend SG"
+  vpc_id = aws_vpc.capstonevpc.id
 
-    ingress {
-        description = "SSH"
-        from_port = 22
-        to_port = 22
-        protocol = "tcp"
-        cidr_blocks = ["10.0.1.0/24", "10.0.2.0/24"]
-        #cidr_blocks = [aws_security_group.capfrontend-SG.id]
-    }
+  ingress {
+    description = "SSH"
+    from_port = var.ssh_port
+    to_port = var.ssh_port
+    protocol = "tcp"
+    cidr_blocks = ["10.0.1.0/24", "10.0.2.0/24"]
+    #cidr_blocks = [aws_security_group.capfrontend-SG.id]
+  }
 
-    ingress {
-        description = "MYSQL/Aurora"
-        from_port = 3306
-        to_port = 3306
-        protocol = "tcp"
-        cidr_blocks = ["10.0.1.0/24", "10.0.2.0/24"]
-        #cidr_blocks = [aws_security_group.capfrontend-SG.id]
-    }
+  ingress {
+    description = "MYSQL/Aurora"
+    from_port = var.mysql_port
+    to_port = var.mysql_port
+    protocol = "tcp"
+    cidr_blocks = ["10.0.1.0/24", "10.0.2.0/24"]
+    #cidr_blocks = [aws_security_group.capfrontend-SG.id]
+  }
 
-    egress {
-        from_port = 0
-        to_port = 0
-        protocol = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = [var.all_access_cidr]
+  }
 }
 
 #Creating Multi AZ RDS
 #Creating RDS subnet group
 resource "aws_db_subnet_group" "cap-db-sn" {
-    name = "cap-db-sn"
-    subnet_ids = [aws_subnet.capprv1.id, aws_subnet.capprv2.id]
-    tags = {
-      Name = "cap-db-subnet"
-    }
+  name = "cap-db-sn"
+  subnet_ids = [aws_subnet.capprv1.id, aws_subnet.capprv2.id]
+  tags = {
+    Name = "cap-db-subnet"
+  }
 }
 
 #Creating Database
 resource "aws_db_instance" "capdb" {
-    identifier = "capdb"
-    allocated_storage = 10
-    db_name = "capdb"
-    engine = "mysql"
-    engine_version = "8.0.33"
-    instance_class = "db.t3.micro"
-    publicly_accessible = false
-    username = "Admin"
-    password = "Admin123"
-    parameter_group_name = "default.mysql8.0"
-    db_subnet_group_name = "cap-db-sn"
-    vpc_security_group_ids = [aws_security_group.capbackend-SG.id]
-    skip_final_snapshot = true
-    port = 3306
-    max_allocated_storage = 1000
-    apply_immediately = true
-    multi_az = true
+  identifier = var.database_identifier
+  allocated_storage = 10
+  db_name = var.database_name
+  engine = "mysql"
+  engine_version = var.Dbase_version
+  instance_class = "db.t3.micro"
+  publicly_accessible = false
+  username = var.database_username
+  password = var.database_password
+  parameter_group_name = "default.mysql8.0"
+  db_subnet_group_name = aws_db_subnet_group.cap-db-sn.id
+  vpc_security_group_ids = [aws_security_group.capbackend-SG.id]
+  skip_final_snapshot = true
+  port = var.mysql_port
+  max_allocated_storage = 1000
+  apply_immediately = true
+  #multi_az = true
 }
 
 #Creating S3 Bucket
 #Creating S3 media bucket
 resource "aws_s3_bucket" "capmedia" {
-    bucket = "capmedia"
-    force_destroy = true
-    tags = {
-        Name = "cap-media"
-    }
+  bucket = "capmedia"
+  force_destroy = true
+  tags = {
+      Name = "cap-media"
+  }
 }
 
-#
+#aws_s3_bucket_ownership_controls
 resource "aws_s3_bucket_ownership_controls" "capmedia-ct" {
     bucket = aws_s3_bucket.capmedia.id
     rule {
@@ -237,6 +241,7 @@ resource "aws_s3_bucket_ownership_controls" "capmedia-ct" {
     depends_on = [ aws_s3_bucket_public_access_block.capmedia-pab ]
 }
 
+#aws_s3_bucket_public_access_block"
 resource "aws_s3_bucket_public_access_block" "capmedia-pab" {
     bucket = aws_s3_bucket.capmedia.id
     block_public_acls = false
@@ -245,6 +250,7 @@ resource "aws_s3_bucket_public_access_block" "capmedia-pab" {
     restrict_public_buckets = false   
 }
 
+#aws_s3_bucket_acl
 resource "aws_s3_bucket_acl" "cap-media-acl" {
     bucket = aws_s3_bucket.capmedia.id
     depends_on = [ aws_s3_bucket_ownership_controls.capmedia-ct]
@@ -255,7 +261,7 @@ resource "aws_s3_bucket_acl" "cap-media-acl" {
 resource "aws_s3_bucket_policy" "cap-media-policy" {
     bucket = aws_s3_bucket.capmedia.id
     policy = jsonencode({
-        id = cap-media-policy
+        id = "cap-media-policy"
         statement = [
             {
                 Action = ["s3:GetObject", "s3:GetObjectVersion"]
@@ -271,7 +277,6 @@ resource "aws_s3_bucket_policy" "cap-media-policy" {
     })
     depends_on = [ aws_s3_bucket_public_access_block.capmedia-pab ]
 }
-
 
 #Creating S3 code bucket
 resource "aws_s3_bucket" "capcode" {
@@ -301,11 +306,10 @@ resource "aws_s3_bucket_ownership_controls" "cap-log-ct" {
 }
 
 #Creating log bucket policy
-
 resource "aws_s3_bucket_policy" "log-policy" {
     bucket = aws_s3_bucket.cap-log.id
     policy = jsonencode({
-    id = cap-log-policy
+    id = "cap-log-policy"
         statement = [
             {
                 Action = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"]
@@ -340,23 +344,23 @@ data "aws_iam_policy_document" "cap-S3IAM-rol" {
     }
 }
 
+#aws_iam_policy
 resource "aws_iam_policy" "S3IAM-policy" {
-    name = "S3IAM-policy"
-    description = "Access to Ec2 instnace and S3 bucket"
-    policy = data.aws_iam_policy_document.cap-S3IAM-pol.json
+  name = "S3IAM-policy"
+  description = "Access to Ec2 instnace and S3 bucket"
+  policy = data.aws_iam_policy_document.cap-S3IAM-pol.json
 }
-
 data "aws_iam_policy_document" "cap-S3IAM-pol" {
-    statement {
-      effect = "Allow"
-      actions = ["s3:*"]
-      resources = ["*"]
-    }
+  statement {
+    effect = "Allow"
+    actions = ["s3:*"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "cap-S3IAM" {
-    role = aws_iam_role.cap-S3IAM.name
-    policy_arn = aws_iam_policy.S3IAM-policy.arn
+  role = aws_iam_role.cap-S3IAM.name
+  policy_arn = aws_iam_policy.S3IAM-policy.arn
 }
 
 resource "aws_iam_instance_profile" "cap-S3IAM" {
@@ -367,66 +371,100 @@ resource "aws_iam_instance_profile" "cap-S3IAM" {
 #Wordpress configuration and spinning up instance
 ## Creating keypair
 resource "aws_key_pair" "keypair" {
-    key_name = "capstone-keypair"
-    #public_key = file("~/devops/ssh_key_pair")
-    public_key = file("~/devops/set-16-keypair.pem")
+    key_name = var.keyname
+    public_key = file(var.cap-keypair-path)
 }
 
 #Creating webserver
 resource "aws_instance" "webserver" {
-    ami = "ami-0ca5ef73451e16dc1"
-    instance_type = "t2.micro"
-    key_name = "keypair"
+    ami = var.ami
+    instance_type = var.instance-type
+    key_name = var.keyname
     subnet_id = aws_subnet.cappub1.id
     vpc_security_group_ids = [aws_security_group.capfrontend-SG.id]
     iam_instance_profile = "aws_iam_instance_profile.cap-S3IAM.id"
     associate_public_ip_address = true
-    user_data = <<-EOF
-        #!/bin/bash
-        sudo yum update -y
-        sudo yum upgrade -y
-        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-        unzip awscliv2.zip
-        sudo ./aws/install
-        sudo yum install httpd php php-mysqlnd -y
-        cd /var/www/html
-        echo "This is a test file" > indextest.html
-        sudo yum install wget -y
-        wget https://wordpress.org/wordpress-6.1.1.tar.gz
-        tar -xzf wordpress-6.1.1.tar.gz
-        cp -r wordpress/* /var/www/html/
-        rm -rf wordpress
-        rm -rf wordpress-6.1.1.tar.gz
-        chmod -R 755 wp-content
-        chown -R apache:apache wp-content
-        cd /var/www/html && mv wp-config-sample.php wp-config.php
-        sed -i "s@define( 'DB_NAME', 'database_name_here' )@define( 'DB_NAME', 'capdb' )@g" /var/www/html/wp-config.php
-        sed -i "s@define( 'DB_USER', 'username_here' )@define( 'DB_USER', 'Admin' )@g" /var/www/html/wp-config.php
-        sed -i "s@define( 'DB_PASSWORD', 'password_here' )@define( 'DB_PASSWORD', 'Admin123' )@g" /var/www/html/wp-config.php
-        sed -i "s@define( 'DB_HOST', 'localhost' )@define( 'DB_HOST', '${element(split(":", aws_db_instance.capdb.endpoint), 0)}')@g" /var/www/html/wp-config.php
-        sudo chkconfig httpd on
-        sudo service httpd start
-        sudo sed -i 's/enforcing/disabled/g' /etc/selinux/config /etc/selinux/config
-        sudo reboot
-        
-
-        #sudo vi crontab
-        #* * * * * ec2-user /usr/local/bin/aws s3 sync --delete s3://capcode /var/www/html/
-        EOF
+    user_data = templatefile(var.wordpress, {
+    database_name = var.database_name,
+    database_username = var.database_username,
+    database_password = var.database_password,
+    db_endpoint= aws_db_instance.capdb.endpoint,
+    cloud_front_name = data.aws_cloudfront_distribution.cap-cloudfront.domain_name,
+    REQUEST_FILENAME = "{REQUEST_FILENAME}"
+    })
     tags = {
             Name = "webserver"
     }
 }
 
-#cloud front
+#cloud front distribution
+locals {
+  s3_origin_id = "aws_s3_bucket.capmedia.bucket"
+}
+resource "aws_cloudfront_distribution" "cap-cldfront" {
+    origin {
+      domain_name = aws_s3_bucket.capmedia.bucket_domain_name
+      origin_id = local.s3_origin_id
+    }
+    enabled = true
+    # is_ipv6_enabled = true
+    # default_root_object = "index.html"
+
+    # logging_config {
+    #     include_cookies = false
+    #     bucket = "cap-log.s3.amazonaws.com"
+    #     prefix = "mylog"
+    #   }
+    #   aliases = [var.domain_name]
+
+    default_cache_behavior {
+      allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH","HEAD", "OPTIONS"]
+      cached_methods = ["GET", "HEAD"]
+      target_origin_id = local.s3_origin_id
+
+      forwarded_values {
+        query_string = false
+        cookies {
+          forward = "none"
+        }
+      }
+      viewer_protocol_policy = "allow-all"
+      min_ttl = 0
+      default_ttl = 0
+      max_ttl = 600
+    }
+    price_class = "PriceClass_All"
+    restrictions {
+      geo_restriction {
+        restriction_type = "none"
+      }
+    }
+    
+    viewer_certificate{
+      cloudfront_default_certificate = true
+    }
+    
+}
+
+#Exporting from CloudFront
+data "aws_cloudfront_distribution" "cap-cloudfront" {
+  id = aws_cloudfront_distribution.cap-cldfront.id
+  
+}
 
 #creating AMI
 resource "aws_ami_from_instance" "cap-ami" {
     name = "cap-ami"
-    source_instance_id = ""
-    delete_on_termination = true
+    source_instance_id = aws_instance.webserver.id
+    snapshot_without_reboot = true
+    depends_on = [ aws_instance.webserver, time_sleep.EC2-wait-time ]
 }
 
+#Sleep time to delay AMI resoures creation
+resource "time_sleep" "EC2-wait-time" {
+    depends_on = [ aws_instance.webserver ]
+    create_duration = "300s"  
+}
 #Create Target group
 resource "aws_lb_target_group" "cap-tg" {
     name = "cap-tg"
@@ -445,7 +483,7 @@ resource "aws_lb_target_group_attachment" "cap-tg-attach" {
 
 #Create load balancer
 #Create application load balancer
-resource "aws_elb" "cap-lb" {
+resource "aws_lb" "cap-lb" {
     name = "cap-lb"
     internal = false
     load_balancer_type = "application"
@@ -473,11 +511,11 @@ resource "aws_lb_listener" "cap-lb-listner" {
 resource "aws_launch_configuration" "cap-asg-lc" {
     name = "cap-asg-lc"
     image_id = aws_ami_from_instance.cap-ami.id
-    instance_type = "t2.micro"
+    instance_type = var.instance-type
     iam_instance_profile = aws_iam_instance_profile.cap-S3IAM.arn
     associate_public_ip_address = true
     security_groups = [aws_security_group.capfrontend-SG.id]
-    key_name = "keypair"
+    key_name = var.keyname
 
     lifecycle {
       create_before_destroy = true
@@ -493,10 +531,17 @@ resource "aws_autoscaling_group" "cap-asg" {
     desired_capacity = 2
     min_size = 1
     max_size = 4
+    health_check_type = "EC2"
+    health_check_grace_period = 300
     lifecycle {
       create_before_destroy = true
     }  
     force_delete = true
+    tag {
+      key = "cap-asg"
+      value = "asg"
+      propagate_at_launch = true
+    }
 }
 
 #Attaching load balancer to ASG
@@ -508,32 +553,34 @@ resource "aws_autoscaling_attachment" "cap-asg-attachment" {
 #Creating ASG policy
 resource "aws_autoscaling_policy" "cap-asg-policy" {
     name = "cap-asg-policy"
+    scaling_adjustment = 4
+    adjustment_type = "ChangeInCapcity"
     autoscaling_group_name = aws_autoscaling_group.cap-asg.name
+    policy_type = "TargetTrackingScaling"
     target_tracking_configuration {
       predefined_metric_specification {
         predefined_metric_type = "ASGAverageCPUUtilzation"
       }
       target_value = 30.0
     }
-    estimated_instance_warmup = 300
-  
+    estimated_instance_warmup = 300  
 }
 
 #Hosted Zone
 #Create Hosted zone
-resource "aws_route53_zone" "cap-HZ" {
+data "aws_route53_zone" "cap-HZ" {
     name = "greatminds.sbs"  
 }
 
 #Create an record
 resource "aws_route53_record" "cap-www" {
-    zone_id = aws_route53_zone.cap-HZ.id
-    name = "greatminds.sbs"
+    zone_id = data.aws_route53_zone.cap-HZ.id
+    name = "www.${data.aws_route53_zone.cap-HZ.name}"
     type = "A"
-    ttl = 300
+    #ttl = 300
     alias {
       name = aws_lb.cap-lb.dns_name 
-      zone_id = aws_lb_cap-lb.zone_id
+      zone_id = aws_lb.cap-lb.zone_id
       evaluate_target_health = true
     }
 }
@@ -543,73 +590,124 @@ resource "aws_route53_record" "cap-www" {
 #Monitoring
 #Create SNS topic and subscription
 resource "aws_sns_topic" "cap-update" {
-    name = "cap-update"
-    delivery_policy = <<EOF
-    {
-        "http":{
-            "defaultHealthRetryPolicy": {
-                "minDelayTarget":20,
-                "maxDelayTarget":20,
-                "numRetries" : 3,
-                "numMaxDelayRetries" :0,
-                "numNoDelayRetries" :0,
-                "numMinDelayRetries" :0,
-                backoffFunction": "linear"
-            },
-            "disableSubscriptionOverrides":false,
-            "defaultThrottlePolicy": {
-                "maxReceivesPerSecond" :1
-            }
-        }
+  name = "cap-update"
+  delivery_policy = <<EOF
+{
+  "http":{
+    "defaultHealthRetryPolicy": {
+      "minDelayTarget":20,
+      "maxDelayTarget":20,
+      "numRetries" : 3,
+      "numMaxDelayRetries" :0,
+      "numNoDelayRetries" :0,
+      "numMinDelayRetries" :0,
+      "backoffFunction": "linear"
+  },
+    "disableSubscriptionOverrides":false,
+    "defaultThrottlePolicy": {
+      "maxReceivesPerSecond" :1
     }
-    EOF
+  }
+}
+EOF
+}
+
+locals {
+  emails = var.email
 }
 #SNS subcription
 resource "aws_sns_topic_subscription" "cap-sns-sub" {
+  count = length(local.emails)
     topic_arn = aws_sns_topic.cap-update.arn
     protocol = "email"
-    endpoint = "victor.adepoju@cloudhight.com"
+    endpoint = local.emails[count.index]
 }
-#Create cloudwatch dashboard for EC2 instance and auto scaling group
-resource "aws_cloudwatch_dashboard" "cap-dashboard" {
-    dashboard_name = "cap-dashboard"
-    dashboard_body = jsonencode({
-        widget = [
-            {
-                type = "metric"
-                x = 0
-                y = 0
-                width = 12
-                height = 6
-                properties = {
-                    metric = [
-                        [
-                            "AWS/EC2",
-                        "CPUUtilization",
-                        "InstanceId",
-                        "i-012345"
-                        ]
-                    ]
-                    period = 300
-                    stat = "Average"
-                    region = "eu-north"
-                    title = "EC2 Instance CPU"
-                }
-            },
-            {
-               type = "text"
-                x = 0
-                y = 7
-                width = 3
-                height = 3
-                properties = {
-                    markdown = "Hello world"
-                }
+#Create cloudwatch dashboard for EC2 instance
+resource "aws_cloudwatch_dashboard" "cap-ec2-dashboard" {
+  dashboard_name = "cap-ec2-dashboard"
+  dashboard_body = jsonencode({
+    widget = [
+      {
+        type = "metric"
+        properties = {
+          metric = [
+              [ "AWS/EC2", "CPUUtilization", "InstanceId", "${aws_instance.webserver.id}", {"label": "Average CPU utilization"}]
+          ]
+          period = 300
+          stat = "Average"
+          view = "timeSeries"
+          region = "eu-north-1"
+          title = "Average CPU Ultilization"
+          stacked = false
+          yAxis = {
+            left = {
+              label = "Percentage"
+              showUnit = true
             }
-        ]
-    })
-  
+          }
+        }
+      },
+    ]
+  }) 
 }
-#Create cloud watch metric for EC2 instance and auto scaling group
+#Create cloudwatch dashboard for auto scaling group
+resource "aws_cloudwatch_dashboard" "cap-asg-dashboard" {
+  dashboard_name = "cap-asg-dashboard"
+  dashboard_body = jsonencode({
+    widget = [
+      {
+        type = "metric"
+        properties = {
+          metric = [
+              [ "AWS/EC2", "CPUUtilization", "AutoScalingGroupName", "${aws_autoscaling_group.cap-asg.id}", {"label": "Average CPU utilization"}]
+          ]
+          period = 300
+          stat = "Average"
+          view = "timeSeries"
+          region = "eu-north-1"
+          title = "Average CPU Ultilization"
+          stacked = false
+          yAxis = {
+            left = {
+              label = "Percentage"
+              showUnit = true
+            }
+          }
+        }
+      },
+    ]
+  }) 
+}
+#Create cloud watch metric for EC2 instance
+resource "aws_cloudwatch_metric_alarm" "cap-ec2-cloudwatch-alarm" {
+  alarm_name = "cap-ec2-cloudwatch-alarm"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods = 2
+  metric_name = "CPUUtilization"
+  namespace = "AWS/EC2"
+  period = 120
+  statistic = "Average"
+  threshold = 80
+  alarm_description = "This metric monitors EC2 CPU utilization"
+  insufficient_data_actions = []  
+}
+#Create cloud watch metric for autoscaling group
+
+resource "aws_cloudwatch_metric_alarm" "cap-asg-cloudwatch-alarm" {
+  alarm_name = "cap-asg-cloudwatch-alarm"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods = 2
+  metric_name = "CPUUtilization"
+  namespace = "AWS/EC2"
+  period = 120
+  statistic = "Average"
+  threshold = 80
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.cap-asg.name
+  }
+  alarm_description = "This metric monitors EC2 CPU utilization"
+  alarm_actions = [aws_autoscaling_policy.cap-asg-policy.arn]  
+}
+
 
 #Simulate failure and stress
